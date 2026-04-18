@@ -13,7 +13,7 @@ npm install
 2. Set your Gemini API key using an environment variable:
 
 ```bash
-setx GEMINI_API_KEY "AIzaSyBjs1ApmUcn4ORxc7tymIz50uEnC-aNnL8"
+setx GEMINI_API_KEY "YOUR_NEW_GEMINI_API_KEY"
 ```
 
 3. (Optional) Set the default Gemini model. The script uses `gemini-2.5-flash` by default:
@@ -62,7 +62,7 @@ The site will serve the static front-end from `public/` and the API from `/api/c
 
 ## Notes
 
-- The script uses `GEMINI_API_KEY` from the environment, but it also has a direct fallback key configured.
+- The script uses `GEMINI_API_KEY` from the environment only.
 - The assistant now supports multi-turn chat within a single session.
 - Saved chats persist in browser localStorage.
 - The browser interface now supports image uploads as prompts. Gemini supports additional multimodal features if you expand the script further.

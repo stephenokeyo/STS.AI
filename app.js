@@ -2,7 +2,7 @@ const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const readline = require('readline');
 
-const API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyBjs1ApmUcn4ORxc7tymIz50uEnC-aNnL8';
+const API_KEY = process.env.GEMINI_API_KEY;
 const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const DEFAULT_TEMPERATURE = parseFloat(process.env.GEMINI_TEMPERATURE) || 1;
 const HISTORY_FILE = 'chat_history.txt';
