@@ -170,22 +170,29 @@
       sendButton.disabled = true;
 
       try {
-        const response = await fetch('/api/chat', {
+        // Determine API URL based on environment
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const apiUrl = isLocal ? 'http://localhost:3000/api/chat' : '/api/chat';
+
+        const response = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt, image: imageData, imageType }),
         });
 
-        const data = await response.json();
-        if (response.ok) {
-          addMessage('STS.AI', data.response, 'assistant');
-          statusEl.textContent = 'Response received.';
-        } else {
-          const errorText = data.error || 'Unknown error';
-          addMessage('Error', errorText, 'assistant');
+        if (!response.ok) {
+          const responseText = await response.text();
+          console.error('API Error:', response.status, responseText);
+          addMessage('Error', `HTTP ${response.status}: ${responseText}`, 'assistant');
           statusEl.textContent = 'Error returned.';
+          return;
         }
+
+        const data = await response.json();
+        addMessage('STS.AI', data.response, 'assistant');
+        statusEl.textContent = 'Response received.';
       } catch (error) {
+        console.error('Network error:', error);
         addMessage('Error', error.message || 'Network error', 'assistant');
         statusEl.textContent = 'Network error.';
       } finally {
