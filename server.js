@@ -2,7 +2,7 @@ const path = require('path');
 const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyBjs1ApmUcn4ORxc7tymIz50uEnC-aNnL8';
+const API_KEY = process.env.GEMINI_API_KEY;
 const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const DEFAULT_TEMPERATURE = parseFloat(process.env.GEMINI_TEMPERATURE) || 1;
 
@@ -17,6 +17,10 @@ app.post('/api/chat', async (req, res) => {
   const { prompt, image, imageType } = req.body;
   const promptText = typeof prompt === 'string' ? prompt.trim() : '';
   const hasImage = typeof image === 'string' && image.length > 0;
+
+  if (!API_KEY) {
+    return res.status(500).json({ error: 'Gemini API key is not configured.' });
+  }
 
   if (!promptText && !hasImage) {
     return res.status(400).json({ error: 'Missing prompt or image in request body.' });
