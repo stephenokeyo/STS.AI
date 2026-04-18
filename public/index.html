@@ -27,8 +27,12 @@
 
     <div>
       <textarea id="prompt" placeholder="Ask STS.AI anything..."></textarea>
-      <button id="send">Send</button>      <button id="saveChat">Save Chat</button>
-      <button id="loadChats">Load Saved Chats</button>      <div class="status" id="status">Ready.</div>
+      <input type="file" id="imageUpload" accept="image/*" style="margin-top: 12px; width: 100%;" />
+      <div id="imagePreview" style="margin-top: 12px;"></div>
+      <button id="send">Send</button>
+      <button id="saveChat">Save Chat</button>
+      <button id="loadChats">Load Saved Chats</button>
+      <div class="status" id="status">Ready.</div>
     </div>
 
     <div class="chat" id="chat"></div>
@@ -43,6 +47,8 @@
 
   <script>
     const promptInput = document.getElementById('prompt');
+    const imageInput = document.getElementById('imageUpload');
+    const imagePreview = document.getElementById('imagePreview');
     const sendButton = document.getElementById('send');
     const saveChatButton = document.getElementById('saveChat');
     const loadChatsButton = document.getElementById('loadChats');
@@ -54,11 +60,17 @@
     const deleteAllButton = document.getElementById('deleteAll');
 
     function saveChat() {
-      const messages = Array.from(chatEl.children).map(msg => ({
-        role: msg.querySelector('.meta').textContent,
-        text: msg.querySelector('div:last-child').innerHTML.replace(/<br>/g, '\n'),
-        type: msg.classList.contains('user') ? 'user' : 'assistant'
-      }));
+      const messages = Array.from(chatEl.children).map(msg => {
+        const contentEl = msg.querySelector('.content');
+        return {
+          role: msg.querySelector('.meta').textContent,
+          text: contentEl ? contentEl.textContent : '',
+          image: msg.dataset.image || null,
+          imageType: msg.dataset.imageType || null,
+          type: msg.classList.contains('user') ? 'user' : 'assistant'
+        };
+      });
+
       if (messages.length === 0) return;
       const timestamp = new Date().toISOString();
       const savedChats = JSON.parse(localStorage.getItem('geminiChats') || '[]');
@@ -113,7 +125,7 @@
 
     function loadChat(messages) {
       chatEl.innerHTML = '';
-      messages.forEach(msg => addMessage(msg.role, msg.text, msg.type));
+      messages.forEach(msg => addMessage(msg.role, msg.text, msg.type, msg.image, msg.imageType));
       savedChatsEl.style.display = 'none';
       chatEl.style.display = 'block';
       statusEl.textContent = 'Chat loaded.';
@@ -131,10 +143,20 @@
 
     async function sendPrompt() {
       const prompt = promptInput.value.trim();
-      if (!prompt) return;
+      const file = imageInput.files[0];
+      if (!prompt && !file) return;
 
-      addMessage('You', prompt, 'user');
+      let imageData = null;
+      let imageType = null;
+      if (file) {
+        imageData = await readFileAsBase64(file);
+        imageType = file.type || 'image/jpeg';
+      }
+
+      addMessage('You', prompt || '(image prompt)', 'user', imageData, imageType);
       promptInput.value = '';
+      imageInput.value = '';
+      imagePreview.innerHTML = '';
       statusEl.textContent = 'Sending prompt...';
       sendButton.disabled = true;
 
@@ -142,7 +164,7 @@
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt }),
+          body: JSON.stringify({ prompt, image: imageData, imageType }),
         });
 
         const data = await response.json();
@@ -162,17 +184,56 @@
       }
     }
 
-    function addMessage(role, text, type) {
+    function addMessage(role, text, type, imageData = null, imageType = null) {
       const messageEl = document.createElement('div');
       messageEl.className = `message ${type}`;
-      messageEl.innerHTML = `<div class="meta">${role}</div><div>${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+      messageEl.dataset.image = imageData || '';
+      if (imageData) {
+        messageEl.dataset.imageType = imageType || 'image/jpeg';
+      }
+
+      const contentHtml = `<div class="meta">${role}</div><div class="content">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+      messageEl.innerHTML = contentHtml;
+      if (imageData) {
+        const img = document.createElement('img');
+        img.src = `data:${imageType || 'image/jpeg'};base64,${imageData}`;
+        img.style.maxWidth = '100%';
+        img.style.marginTop = '8px';
+        messageEl.appendChild(img);
+      }
+
       chatEl.appendChild(messageEl);
       window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    function readFileAsBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = reader.result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = () => reject(new Error('Unable to read image file'));
+        reader.readAsDataURL(file);
+      });
     }
 
     function escapeHtml(str) {
       return str.replace(/[&<>"]/g, (tag) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[tag]));
     }
+
+    imageInput.addEventListener('change', () => {
+      const file = imageInput.files[0];
+      if (!file) {
+        imagePreview.innerHTML = '';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        imagePreview.innerHTML = `<img src="${reader.result}" style="max-width: 100%; border-radius: 12px; border: 1px solid #ccd6dd;" />`;
+      };
+      reader.readAsDataURL(file);
+    });
 
     sendButton.addEventListener('click', sendPrompt);
     promptInput.addEventListener('keydown', (event) => {

@@ -64,5 +64,5 @@ The site will serve the static front-end from `public/` and the API from `/api/c
 
 - The script uses `GEMINI_API_KEY` from the environment, but it also has a direct fallback key configured.
 - The assistant now supports multi-turn chat within a single session.
-- Your conversation history is persisted in `chat_history.txt`.
-- This example demonstrates text generation only. Gemini supports additional multimodal features if you expand the script further.
+- Saved chats persist in browser localStorage.
+- The browser interface now supports image uploads as prompts. Gemini supports additional multimodal features if you expand the script further.

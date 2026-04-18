@@ -12,13 +12,29 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Only POST requests are allowed.' });
   }
 
-  const { prompt } = req.body;
-  if (!prompt || typeof prompt !== 'string') {
-    return res.status(400).json({ error: 'Missing prompt in request body.' });
+  const { prompt, image, imageType } = req.body;
+  const promptText = typeof prompt === 'string' ? prompt.trim() : '';
+  const hasImage = typeof image === 'string' && image.length > 0;
+
+  if (!promptText && !hasImage) {
+    return res.status(400).json({ error: 'Missing prompt or image in request body.' });
   }
 
   if (!API_KEY) {
     return res.status(500).json({ error: 'Gemini API key is not configured.' });
+  }
+
+  const parts = [];
+  if (promptText) {
+    parts.push({ text: promptText });
+  }
+  if (hasImage) {
+    parts.push({
+      image: {
+        imageBytesBase64: image,
+        mimeType: imageType || 'image/jpeg',
+      },
+    });
   }
 
   try {
@@ -26,7 +42,7 @@ module.exports = async (req, res) => {
       contents: [
         {
           role: 'user',
-          parts: [{ text: prompt }],
+          parts,
         },
       ],
       generationConfig: { temperature: DEFAULT_TEMPERATURE },

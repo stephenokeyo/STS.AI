@@ -14,10 +14,25 @@ const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: DEFAULT_MODEL });
 
 app.post('/api/chat', async (req, res) => {
-  const { prompt } = req.body;
+  const { prompt, image, imageType } = req.body;
+  const promptText = typeof prompt === 'string' ? prompt.trim() : '';
+  const hasImage = typeof image === 'string' && image.length > 0;
 
-  if (!prompt || typeof prompt !== 'string') {
-    return res.status(400).json({ error: 'Missing prompt in request body.' });
+  if (!promptText && !hasImage) {
+    return res.status(400).json({ error: 'Missing prompt or image in request body.' });
+  }
+
+  const parts = [];
+  if (promptText) {
+    parts.push({ text: promptText });
+  }
+  if (hasImage) {
+    parts.push({
+      image: {
+        imageBytesBase64: image,
+        mimeType: imageType || 'image/jpeg',
+      },
+    });
   }
 
   try {
@@ -25,7 +40,7 @@ app.post('/api/chat', async (req, res) => {
       contents: [
         {
           role: 'user',
-          parts: [{ text: prompt }],
+          parts,
         },
       ],
       generationConfig: { temperature: DEFAULT_TEMPERATURE },
