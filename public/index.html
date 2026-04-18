@@ -11,6 +11,10 @@
     p { margin-top: 0; color: #555; }
     .status { margin-top: 4px; font-size: 0.9rem; color: #777; }
     textarea { width: 100%; min-height: 120px; border-radius: 12px; border: 1px solid #ccd6dd; padding: 12px; resize: vertical; font-size: 1rem; }
+    .image-upload { margin-top: 12px; border: 2px dashed #ccd6dd; border-radius: 12px; padding: 20px; text-align: center; background: #fafbfc; transition: border-color 0.3s; }
+    .image-upload.dragover { border-color: #0b69ff; background: #e8f0ff; }
+    .image-upload label { cursor: pointer; color: #555; font-size: 1rem; }
+    .image-upload input { display: none; }
     button { margin-top: 12px; padding: 12px 18px; border: none; border-radius: 10px; background: #0b69ff; color: white; font-size: 1rem; cursor: pointer; }
     button:disabled { background: #9bb8ff; cursor: default; }
     .chat { margin-top: 24px; }
@@ -27,7 +31,10 @@
 
     <div>
       <textarea id="prompt" placeholder="Ask STS.AI anything..."></textarea>
-      <input type="file" id="imageUpload" accept="image/*" style="margin-top: 12px; width: 100%;" />
+      <div class="image-upload" id="imageUploadZone">
+        <label for="imageUpload">Click to upload an image or drag & drop here</label>
+        <input type="file" id="imageUpload" accept="image/*" />
+      </div>
       <div id="imagePreview" style="margin-top: 12px;"></div>
       <button id="send">Send</button>
       <button id="saveChat">Save Chat</button>
@@ -48,6 +55,7 @@
   <script>
     const promptInput = document.getElementById('prompt');
     const imageInput = document.getElementById('imageUpload');
+    const imageUploadZone = document.getElementById('imageUploadZone');
     const imagePreview = document.getElementById('imagePreview');
     const sendButton = document.getElementById('send');
     const saveChatButton = document.getElementById('saveChat');
@@ -153,7 +161,8 @@
         imageType = file.type || 'image/jpeg';
       }
 
-      addMessage('You', prompt || '(image prompt)', 'user', imageData, imageType);
+      const displayText = prompt || (file ? '(image only)' : '');
+      addMessage('You', displayText, 'user', imageData, imageType);
       promptInput.value = '';
       imageInput.value = '';
       imagePreview.innerHTML = '';
@@ -222,7 +231,46 @@
       return str.replace(/[&<>"]/g, (tag) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[tag]));
     }
 
-    imageInput.addEventListener('change', () => {
+    imageInput.addEventListener('change', handleImageSelect);
+
+    // Drag and drop functionality
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      imageUploadZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      imageUploadZone.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      imageUploadZone.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight(e) {
+      imageUploadZone.classList.add('dragover');
+    }
+
+    function unhighlight(e) {
+      imageUploadZone.classList.remove('dragover');
+    }
+
+    imageUploadZone.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files.length > 0) {
+        imageInput.files = files;
+        handleImageSelect();
+      }
+    }
+
+    function handleImageSelect() {
       const file = imageInput.files[0];
       if (!file) {
         imagePreview.innerHTML = '';
@@ -233,7 +281,7 @@
         imagePreview.innerHTML = `<img src="${reader.result}" style="max-width: 100%; border-radius: 12px; border: 1px solid #ccd6dd;" />`;
       };
       reader.readAsDataURL(file);
-    });
+    }
 
     sendButton.addEventListener('click', sendPrompt);
     promptInput.addEventListener('keydown', (event) => {
