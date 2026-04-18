@@ -1,0 +1,17 @@
+{
+  "name": "sts.ai",
+  "version": "1.0.0",
+  "description": "This project creates a simple AI assistant using the Google Gemini API in Node.js.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "express": "^5.2.1"
+  }
+}

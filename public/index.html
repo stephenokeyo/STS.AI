@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STS.AI CHAT</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f7fb; color: #1b1f29; }
+    .app { max-width: 900px; margin: 0 auto; padding: 24px; }
+    h1 { margin-bottom: 8px; }
+    p { margin-top: 0; color: #555; }
+    .status { margin-top: 4px; font-size: 0.9rem; color: #777; }
+    textarea { width: 100%; min-height: 120px; border-radius: 12px; border: 1px solid #ccd6dd; padding: 12px; resize: vertical; font-size: 1rem; }
+    button { margin-top: 12px; padding: 12px 18px; border: none; border-radius: 10px; background: #0b69ff; color: white; font-size: 1rem; cursor: pointer; }
+    button:disabled { background: #9bb8ff; cursor: default; }
+    .chat { margin-top: 24px; }
+    .message { padding: 14px 16px; margin-bottom: 12px; border-radius: 14px; }
+    .user { background: #e8f0ff; text-align: right; }
+    .assistant { background: #ffffff; border: 1px solid #dae3ef; }
+    .meta { font-size: 0.8rem; color: #6c7a89; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>STS.AI CHAT</h1>
+    <p>Send prompts to STS.AI CHAT and receive answers in your browser.</p>
+
+    <div>
+      <textarea id="prompt" placeholder="Ask STS.AI anything..."></textarea>
+      <button id="send">Send</button>      <button id="saveChat">Save Chat</button>
+      <button id="loadChats">Load Saved Chats</button>      <div class="status" id="status">Ready.</div>
+    </div>
+
+    <div class="chat" id="chat"></div>
+
+    <div id="savedChats" style="display: none; margin-top: 24px;">
+      <h2>Saved Chats</h2>
+      <div id="chatList"></div>
+      <button id="closeSaved">Close</button>
+      <button id="deleteAll">Delete All Saved Chats</button>
+    </div>
+  </div>
+
+  <script>
+    const promptInput = document.getElementById('prompt');
+    const sendButton = document.getElementById('send');
+    const saveChatButton = document.getElementById('saveChat');
+    const loadChatsButton = document.getElementById('loadChats');
+    const statusEl = document.getElementById('status');
+    const chatEl = document.getElementById('chat');
+    const savedChatsEl = document.getElementById('savedChats');
+    const chatListEl = document.getElementById('chatList');
+    const closeSavedButton = document.getElementById('closeSaved');
+    const deleteAllButton = document.getElementById('deleteAll');
+
+    function saveChat() {
+      const messages = Array.from(chatEl.children).map(msg => ({
+        role: msg.querySelector('.meta').textContent,
+        text: msg.querySelector('div:last-child').innerHTML.replace(/<br>/g, '\n'),
+        type: msg.classList.contains('user') ? 'user' : 'assistant'
+      }));
+      if (messages.length === 0) return;
+      const timestamp = new Date().toISOString();
+      const savedChats = JSON.parse(localStorage.getItem('geminiChats') || '[]');
+      savedChats.push({ timestamp, messages });
+      localStorage.setItem('geminiChats', JSON.stringify(savedChats));
+      statusEl.textContent = 'Chat saved!';
+      setTimeout(() => statusEl.textContent = 'Ready.', 2000);
+    }
+
+    function loadSavedChats() {
+      const savedChats = JSON.parse(localStorage.getItem('geminiChats') || '[]');
+      chatListEl.innerHTML = '';
+      if (savedChats.length === 0) {
+        chatListEl.innerHTML = '<p>No saved chats.</p>';
+      } else {
+        savedChats.forEach((chat, index) => {
+          const chatItem = document.createElement('div');
+          chatItem.style.border = '1px solid #ddd';
+          chatItem.style.padding = '8px';
+          chatItem.style.marginBottom = '8px';
+          chatItem.innerHTML = `<strong>${new Date(chat.timestamp).toLocaleString()}</strong> - ${chat.messages.length} messages`;
+          const loadButton = document.createElement('button');
+          loadButton.textContent = 'Load';
+          loadButton.style.marginLeft = '10px';
+          loadButton.onclick = () => loadChat(chat.messages);
+          chatItem.appendChild(loadButton);
+          const deleteButton = document.createElement('button');
+          deleteButton.textContent = 'Delete';
+          deleteButton.style.marginLeft = '10px';
+          deleteButton.style.background = '#ff4444';
+          deleteButton.style.color = 'white';
+          deleteButton.onclick = () => deleteChat(index);
+          chatItem.appendChild(deleteButton);
+          chatListEl.appendChild(chatItem);
+        });
+      }
+      chatEl.style.display = 'none';
+      savedChatsEl.style.display = 'block';
+    }
+
+    function deleteChat(index) {
+      const savedChats = JSON.parse(localStorage.getItem('geminiChats') || '[]');
+      savedChats.splice(index, 1);
+      localStorage.setItem('geminiChats', JSON.stringify(savedChats));
+      loadSavedChats(); // Refresh the list
+    }
+
+    function deleteAllChats() {
+      localStorage.removeItem('geminiChats');
+      loadSavedChats(); // Refresh the list
+    }
+
+    function loadChat(messages) {
+      chatEl.innerHTML = '';
+      messages.forEach(msg => addMessage(msg.role, msg.text, msg.type));
+      savedChatsEl.style.display = 'none';
+      chatEl.style.display = 'block';
+      statusEl.textContent = 'Chat loaded.';
+    }
+
+    function closeSaved() {
+      savedChatsEl.style.display = 'none';
+      chatEl.style.display = 'block';
+    }
+
+    saveChatButton.addEventListener('click', saveChat);
+    loadChatsButton.addEventListener('click', loadSavedChats);
+    closeSavedButton.addEventListener('click', closeSaved);
+    deleteAllButton.addEventListener('click', deleteAllChats);
+
+    async function sendPrompt() {
+      const prompt = promptInput.value.trim();
+      if (!prompt) return;
+
+      addMessage('You', prompt, 'user');
+      promptInput.value = '';
+      statusEl.textContent = 'Sending prompt...';
+      sendButton.disabled = true;
+
+      try {
+        const response = await fetch('http://localhost:3000/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt }),
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          addMessage('STS.AI', data.response, 'assistant');
+          statusEl.textContent = 'Response received.';
+        } else {
+          const errorText = data.error || 'Unknown error';
+          addMessage('Error', errorText, 'assistant');
+          statusEl.textContent = 'Error returned.';
+        }
+      } catch (error) {
+        addMessage('Error', error.message || 'Network error', 'assistant');
+        statusEl.textContent = 'Network error.';
+      } finally {
+        sendButton.disabled = false;
+      }
+    }
+
+    function addMessage(role, text, type) {
+      const messageEl = document.createElement('div');
+      messageEl.className = `message ${type}`;
+      messageEl.innerHTML = `<div class="meta">${role}</div><div>${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+      chatEl.appendChild(messageEl);
+      window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"]/g, (tag) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[tag]));
+    }
+
+    sendButton.addEventListener('click', sendPrompt);
+    promptInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendPrompt();
+      }
+    });
+  </script>
+</body>
+</html>
